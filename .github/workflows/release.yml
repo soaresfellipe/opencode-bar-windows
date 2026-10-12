@@ -25,7 +25,7 @@ jobs:
     steps:
       # Third-party action pinned to a commit SHA (supply-chain hardening);
       # the trailing comment records the human-readable version.
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Compiles OpenCodeBar.exe with the C# compiler that ships with Windows
       # (.NET Framework 4). Windows-only, same call as the CI build step.
