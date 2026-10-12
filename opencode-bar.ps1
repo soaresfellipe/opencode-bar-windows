@@ -173,6 +173,8 @@ $C = @{
     Orange  = [Drawing.Color]::FromArgb(255, 92, 0)
     Red     = [Drawing.Color]::FromArgb(239, 68, 68)
     Cyan    = [Drawing.Color]::FromArgb(34, 211, 238)
+    MarkLight = [Drawing.Color]::FromArgb(241, 236, 236)
+    MarkDark  = [Drawing.Color]::FromArgb(75, 70, 70)
     Link    = [Drawing.Color]::FromArgb(200, 200, 200)
 }
 $F = @{
@@ -205,6 +207,17 @@ function New-RoundPath([Drawing.RectangleF]$r, [single]$rad) {
     return $p
 }
 
+# Draws the OpenCode logo mark from the official brand SVG's square variant
+# (viewBox 24x30): a light square frame with a square hole at the top middle
+# (painted with the popup background) and a dark inner block at the bottom
+# middle. Vector redraw keeps the mark crisp at any DPI scale.
+function Draw-LogoMark($g, [single]$x, [single]$y, [single]$w, [single]$h) {
+    $u = $w / 24.0
+    $g.FillRectangle((New-Object Drawing.SolidBrush($C.MarkLight)), $x, $y, $w, $h)
+    $g.FillRectangle((New-Object Drawing.SolidBrush($C.Bg)), ($x + 6 * $u), ($y + 6 * $u), (12 * $u), (18 * $u))
+    $g.FillRectangle((New-Object Drawing.SolidBrush($C.MarkDark)), ($x + 6 * $u), ($y + 12 * $u), (12 * $u), (12 * $u))
+}
+
 # Fixed popup height: one pool with three usage bars.
 function Get-PopupSize {
     $s = $script:S
@@ -229,8 +242,13 @@ function Draw-Popup($g, [int]$W, [int]$H) {
     $pen = New-Object Drawing.Pen($C.Border)
     $g.DrawRectangle($pen, 0, 0, $W - 1, $H - 1)
 
-    # Cyan title: the popup's identity accent (Droid Bar's titles are white).
-    Draw-Text $g 'Usage Limits' $F.Title $pad ([int]($pad + 3 * $s)) $C.Cyan
+    # OpenCode logo mark (official brand geometry, dark-background variant from
+    # opencode.ai/brand, redrawn as vector paths so it stays crisp at any DPI)
+    # left of the title, mirroring Droid Bar's header layout.
+    $markH = [int](24 * $s)
+    $markW = [int]($markH * 24 / 30)
+    Draw-LogoMark $g $pad ([int]($pad + 1 * $s)) $markW $markH
+    Draw-Text $g 'Usage Limits' $F.Title ($pad + $markW + [int](9 * $s)) ([int]($pad + 3 * $s)) $C.Text
 
     # bars: the three Go windows (rolling 5-hour, weekly, monthly)
     $y = $pad + [int](50 * $s)

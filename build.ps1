@@ -4,27 +4,21 @@ Add-Type -AssemblyName System.Drawing
 $root = $PSScriptRoot
 $src  = Join-Path $root 'src'
 
-# --- icon: dark circle with a cyan ring and three cyan usage bars (PNGs inside an .ico).
-# The circle + cyan is the app's identity, distinct from Droid Bar's orange rounded square.
+# --- icon: the OpenCode logo mark from the official brand SVG's square variant
+# (viewBox 24x30): light square frame, square hole (left transparent via PNG
+# alpha) and a dark inner block. (PNGs inside an .ico.)
 function New-IconPng([int]$sz) {
     $bmp = New-Object Drawing.Bitmap($sz, $sz)
     $g = [Drawing.Graphics]::FromImage($bmp)
     $g.SmoothingMode = 'AntiAlias'
-    $ringW = [math]::Max(1.0, $sz / 12.0)
-    $body = New-Object Drawing.RectangleF([single]$ringW, [single]$ringW, [single]($sz - 2 * $ringW - 1), [single]($sz - 2 * $ringW - 1))
-    $g.FillEllipse((New-Object Drawing.SolidBrush([Drawing.Color]::FromArgb(18, 18, 18))), $body)
-    $cyan = [Drawing.Color]::FromArgb(34, 211, 238)
-    $g.DrawEllipse((New-Object Drawing.Pen($cyan, $ringW)), $body)
-    $track = New-Object Drawing.SolidBrush([Drawing.Color]::FromArgb(60, 60, 60))
-    $accent = New-Object Drawing.SolidBrush($cyan)
-    $m = $sz * 0.24; $w = $sz - 2 * $m; $h = [math]::Max(2, $sz * 0.11)
-    $i = 0
-    foreach ($f in 0.58, 0.40, 0.20) {
-        $y = $sz * 0.30 + $i * $sz * 0.16
-        $g.FillRectangle($track, [single]$m, [single]$y, [single]$w, [single]$h)
-        $g.FillRectangle($accent, [single]$m, [single]$y, [single]($w * [math]::Max($f, 0.25)), [single]$h)
-        $i++
-    }
+    $m = $sz * 0.06; $w = $sz - 2 * $m
+    $u = $w / 24.0; $h = 30 * $u
+    $frame = New-Object Drawing.SolidBrush([Drawing.Color]::FromArgb(241, 236, 236))
+    $block = New-Object Drawing.SolidBrush([Drawing.Color]::FromArgb(75, 70, 70))
+    # outer frame; the hole (6,6)-(18,24) stays unpainted (transparent)
+    $g.FillRectangle($frame, [single]$m, [single]$m, [single]$w, [single]$h)
+    # inner block (6,12)-(18,24)
+    $g.FillRectangle($block, [single]($m + 6 * $u), [single]($m + 12 * $u), [single](12 * $u), [single](12 * $u))
     $g.Dispose()
     $ms = New-Object IO.MemoryStream
     $bmp.Save($ms, [Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose()

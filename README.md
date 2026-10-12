@@ -9,7 +9,7 @@ A small Windows tray app that shows your [OpenCode](https://opencode.ai) **Go** 
 ## Features
 
 - **Tray icon with your current usage.** It shows the highest Go window percentage and changes color as you approach the limit: dark below 75%, orange from 75%, red from 90%. Hover it for a summary.
-- **Popup on left click**, styled like a dark usage meter, with one bar per Go window (rolling 5-hour, weekly, monthly) and the time left until each window resets.
+- **Popup on left click**, styled like a dark usage meter, with the OpenCode logo and one bar per Go window (rolling 5-hour, weekly, monthly) plus the time left until each window resets.
 - **Notifications** when a window crosses 75%, 90% and 100% (once per threshold), and when a maxed-out window becomes available again.
 - **Right-click menu**: refresh now, open the OpenCode console, set API key, start with Windows, quit.
 - Nothing to install. It runs on Windows PowerShell 5.1 and .NET Framework, which ship with Windows 10/11.
