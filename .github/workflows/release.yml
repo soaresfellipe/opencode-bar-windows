@@ -1,0 +1,106 @@
+# Release for OpenCode Bar: tag -> build -> zip -> GitHub Release.
+#
+# Trigger: a semver tag (vMAJOR.MINOR.PATCH) pushed to the repository, as
+# documented in AGENTS.md "Release steps". The build runs on windows-latest
+# because build.ps1 compiles OpenCodeBar.exe with the .NET Framework 4 csc.exe.
+#
+# The zip layout is the installed layout: OpenCodeBar.exe, opencode-bar.ps1,
+# src/opencode-bar-lib.psm1 (imported by the script at runtime), README.md and
+# LICENSE. Nothing else ships.
+
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 10
+
+    steps:
+      # Third-party action pinned to a commit SHA (supply-chain hardening);
+      # the trailing comment records the human-readable version.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # Compiles OpenCodeBar.exe with the C# compiler that ships with Windows
+      # (.NET Framework 4). Windows-only, same call as the CI build step.
+      - name: Build OpenCodeBar.exe
+        shell: powershell
+        run: .\build.ps1
+
+      # Stage into a temp dir so the zip has exactly the shipped layout and no
+      # CI leftovers; then print the entry list so the run log is the evidence
+      # for the asset contents.
+      - name: Package release zip
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag  = $env:GITHUB_REF_NAME
+          $root = $env:GITHUB_WORKSPACE
+          $pkg  = Join-Path $env:RUNNER_TEMP 'opencode-bar-package'
+          $zip  = Join-Path $root "OpenCodeBar-$tag.zip"
+
+          New-Item -ItemType Directory -Path $pkg -Force | Out-Null
+          New-Item -ItemType Directory -Path (Join-Path $pkg 'src') -Force | Out-Null
+
+          Copy-Item (Join-Path $root 'OpenCodeBar.exe')            $pkg
+          Copy-Item (Join-Path $root 'opencode-bar.ps1')           $pkg
+          Copy-Item (Join-Path $root 'src\opencode-bar-lib.psm1')  (Join-Path $pkg 'src')
+          Copy-Item (Join-Path $root 'README.md')                  $pkg
+          Copy-Item (Join-Path $root 'LICENSE')                    $pkg
+
+          # ZipFile lives in System.IO.Compression.FileSystem.dll; ZipArchiveMode and
+          # ZipArchive live in System.IO.Compression.dll, so both are loaded.
+          Add-Type -AssemblyName System.IO.Compression
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          # Build the archive entry-by-entry with explicit forward-slash names:
+          # CreateFromDirectory on .NET Framework 4 writes 'src\file.psm1' with a
+          # backslash, which is a non-portable entry name (Windows-only unzip).
+          $arc = [System.IO.Compression.ZipFile]::Open($zip, [System.IO.Compression.ZipArchiveMode]::Create)
+          try {
+            foreach ($name in 'OpenCodeBar.exe', 'opencode-bar.ps1', 'src/opencode-bar-lib.psm1', 'README.md', 'LICENSE') {
+              $entry = $arc.CreateEntry($name, [System.IO.Compression.CompressionLevel]::Optimal)
+              $src = [System.IO.File]::OpenRead((Join-Path $pkg $name))
+              try {
+                $dst = $entry.Open()
+                try { $src.CopyTo($dst) } finally { $dst.Dispose() }
+              } finally { $src.Dispose() }
+            }
+          } finally { $arc.Dispose() }
+
+          Write-Host "packed $zip"
+          $check = [System.IO.Compression.ZipFile]::OpenRead($zip)
+          try {
+            foreach ($e in $check.Entries) { Write-Host "  $($e.FullName) ($($e.Length) bytes)" }
+            $missing = @('OpenCodeBar.exe', 'opencode-bar.ps1', 'src/opencode-bar-lib.psm1', 'README.md', 'LICENSE') |
+              Where-Object { $_ -notin @($check.Entries | ForEach-Object { $_.FullName }) }
+            if ($missing.Count -gt 0) {
+              Write-Host "::error::zip is missing: $($missing -join ', ')"
+              exit 1
+            }
+          } finally { $check.Dispose() }
+
+      # Auto-generated release notes (previous tag..current tag) plus the zip.
+      # gh is preinstalled on the GitHub runners; GH_TOKEN is the built-in
+      # GITHUB_TOKEN, which the `contents: write` permission above grants to
+      # this job. gh refuses to authenticate in Actions unless GH_TOKEN is set.
+      - name: Publish GitHub Release
+        shell: cmd
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "%GITHUB_REF_NAME%"
+          "OpenCodeBar-%GITHUB_REF_NAME%.zip"
+          --repo "%GITHUB_REPOSITORY%"
+          --title "%GITHUB_REF_NAME%"
+          --generate-notes
+          --verify-tag
+
+      - name: Summary
+        shell: bash
+        run: echo "Release $GITHUB_REF_NAME published from $GITHUB_SHA"

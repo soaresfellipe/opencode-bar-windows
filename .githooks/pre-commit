@@ -1,0 +1,30 @@
+#!/bin/sh
+# Pre-commit hook: the fast subset of the CI gates, run before a commit exists.
+#
+# Installed per-clone by tools/Install-Hooks.ps1 (or manually with
+# `git config core.hooksPath .githooks`). Every check here has a matching step
+# in .github/workflows/ci.yml, both delegating to tools/RepoChecks.ps1 so the
+# local gate and the CI gate cannot drift.
+#
+# Checks that need pwsh 7 or the full Pester suite (format, coverage) are CI-only;
+# this hook runs parse + lint + secrets + large-file so a broken commit cannot be
+# created locally at all. Skips itself when pwsh is unavailable rather than
+# blocking a Windows-only contributor who has no pwsh installed.
+set -e
+
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root"
+
+pwsh_cmd=$(command -v pwsh || command -v powershell || true)
+if [ -z "$pwsh_cmd" ]; then
+    echo "pre-commit: pwsh not found - skipping local gates (CI still enforces them)"
+    exit 0
+fi
+
+echo "pre-commit: running parse, lint, secrets and large-file gates..."
+"$pwsh_cmd" -NoProfile -File tools/RepoChecks.ps1 -Check parse
+"$pwsh_cmd" -NoProfile -File tools/RepoChecks.ps1 -Check lint
+"$pwsh_cmd" -NoProfile -File tools/RepoChecks.ps1 -Check largefiles
+"$pwsh_cmd" -NoProfile -File tools/RepoChecks.ps1 -Check secrets
+"$pwsh_cmd" -NoProfile -File tools/Test-Docs.ps1
+echo "pre-commit: all local gates passed"

@@ -1,0 +1,101 @@
+# CI for OpenCode Bar: syntax, lint, format, tests, coverage, build and a
+# -Preview smoke run.
+#
+# Every gate delegates to tools/RepoChecks.ps1 so the CI gate and the local
+# pre-commit gate (tools/Install-Hooks.ps1) are literally the same code and
+# cannot drift. Each check is its own step so a failure names the gate.
+#
+# Platform-dependent steps target the app's real runtime (Windows PowerShell 5.1 /
+# .NET Framework 4); the analyzer/Pester steps run under pwsh because the lib
+# module is GUI-free and cross-host testable (see AGENTS.md "Windows-only caveats").
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: windows-latest
+    timeout-minutes: 8
+
+    steps:
+      # Third-party actions are pinned to a commit SHA (supply-chain hardening);
+      # the trailing comment records the human-readable version.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # PS 5.1 syntax gate: the tray app must parse on the Windows PowerShell 5.1
+      # host, not just on pwsh (guards against PS 7-only syntax per AGENTS.md).
+      - name: AST parse gate (PowerShell 5.1)
+        shell: powershell
+        run: .\tools\RepoChecks.ps1 -Check parse
+
+      - name: Install PSScriptAnalyzer (pinned)
+        shell: pwsh
+        run: Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Force -Scope CurrentUser
+
+      - name: Lint (PSScriptAnalyzer, repo settings)
+        shell: pwsh
+        run: .\tools\RepoChecks.ps1 -Check lint
+
+      # Invoke-Formatter is the canonical PowerShell formatter; CI is the
+      # authoritative check for it (the pre-commit hook skips it locally because
+      # it needs the PSScriptAnalyzer engine under pwsh 7).
+      - name: Format check (Invoke-Formatter)
+        shell: pwsh
+        run: .\tools\RepoChecks.ps1 -Check format
+
+      # Repo hygiene gates: oversized files and key-shaped material in the
+      # worktree or in git history.
+      - name: Large-file gate
+        shell: pwsh
+        run: .\tools\RepoChecks.ps1 -Check largefiles
+
+      - name: Secret scan (worktree + history)
+        shell: pwsh
+        run: .\tools\RepoChecks.ps1 -Check secrets
+
+      # Keeps AGENTS.md / README.md from drifting: every repo path and local
+      # link they name must still resolve.
+      - name: Docs check (AGENTS.md / README.md paths and links)
+        shell: pwsh
+        run: .\tools\Test-Docs.ps1
+
+      - name: Install Pester 5.7.1 (pinned, per AGENTS.md)
+        shell: pwsh
+        run: Install-Module Pester -RequiredVersion 5.7.1 -Force -Scope CurrentUser
+
+      - name: Pester tests
+        shell: pwsh
+        run: .\tools\RepoChecks.ps1 -Check tests
+
+      # Enforced coverage floor on the GUI-free lib module, so an agent-authored
+      # change cannot drop coverage without failing the build.
+      - name: Coverage gate (lib module, 85% floor)
+        shell: pwsh
+        run: .\tools\RepoChecks.ps1 -Check coverage -Threshold 85
+
+      # Compiles OpenCodeBar.exe with the .NET Framework 4 csc.exe (Windows only).
+      - name: Build OpenCodeBar.exe
+        shell: powershell
+        run: .\build.ps1
+
+      # Headless validation protocol (AGENTS.md): render the popup + tray icon
+      # from mock data into PNGs; uploaded as artifacts below.
+      - name: Smoke preview (mock data)
+        shell: cmd
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File opencode-bar.ps1 -Mock samples\mock.json -Preview out.png
+
+      - name: Upload preview artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: preview-pngs
+          path: |
+            out.png
+            out-icon.png
+          if-no-files-found: error

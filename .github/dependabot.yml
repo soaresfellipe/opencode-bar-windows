@@ -1,0 +1,30 @@
+# Dependency update automation.
+#
+# There is no lockfile-driven ecosystem here (the app ships no runtime
+# dependencies), but the supply chain still has a moving part: the third-party
+# GitHub Actions the workflows run. The two PowerShell modules the gates
+# install (PSScriptAnalyzer, Pester) are version-pinned in CI instead, so
+# Dependabot only watches the Actions references.
+#
+# `cooldown` is the delay gate: an update is not even proposed until the
+# upstream release has been out for 7 days, so a compromised or broken release
+# cannot be pulled into a green build the day it publishes. The Pester pin in
+# AGENTS.md / CI is 5.7.1; dependabot proposes bumps, a human merges.
+
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    labels:
+      - type/chore
+      - area/ci
+    groups:
+      actions:
+        patterns:
+          - '*'
