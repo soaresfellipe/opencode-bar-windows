@@ -8,9 +8,10 @@ Guidance for coding agents working in this repository.
 OpenCode Bar is a **Windows tray app** that shows your [OpenCode](https://opencode.ai) **Go**
 plan usage limits (rolling 5-hour, weekly and monthly windows) and notifies you when you
 approach a limit. It polls `GET https://opencode.ai/zen/go/v1/usage` with a DPAPI-protected
-API key, shows a tray icon (highest window percentage, color-coded), renders a dark popup
-with one bar per window, and fires threshold notifications (75% / 90% / 100%) once per
-threshold. No telemetry; the only host it talks to is `opencode.ai`.
+API key, shows a color-coded OpenCode logo tray icon (dark below 75%, orange from 75%,
+red from 90%), renders a dark popup with one bar per window, and fires threshold
+notifications (75% / 90% / 100%) once per threshold. No telemetry; the only host it talks
+to is `opencode.ai`.
 
 The endpoint is not publicly documented. The response contract implemented here mirrors
 what the [opencode-quota](https://github.com/slkiser/opencode-quota) project reads from

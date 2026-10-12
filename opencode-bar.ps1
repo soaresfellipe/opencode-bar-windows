@@ -319,38 +319,39 @@ function New-TrayBitmap([string]$text, $bg, $fg, [int]$sz) {
     $g = [Drawing.Graphics]::FromImage($bmp)
     $g.SmoothingMode = 'AntiAlias'
     $g.TextRenderingHint = 'AntiAliasGridFit'
-    # Circle body + cyan ring: the ring is the app's visual identity, so the icon
-    # is distinguishable from Droid Bar's orange rounded square at a glance. The
-    # fill keeps the usage semantics (dark/orange/red); the ring never changes.
-    $rect = New-Object Drawing.RectangleF(1, 1, ($sz - 3), ($sz - 3))
-    $g.FillEllipse((New-Object Drawing.SolidBrush($bg)), $rect)
-    $ring = New-Object Drawing.Pen($C.Cyan, [math]::Max(1.0, $sz / 12.0))
-    $g.DrawEllipse($ring, $rect)
-    $ring.Dispose()
-    # Mini OpenCode logo mark badge at the top-left corner (official brand
-    # geometry, 24x30 viewBox): sits next to the usage number so the icon reads
-    # as OpenCode at a glance. At 16 px it shrinks to a speck; at 20-24 px
-    # (higher DPI) the mark's silhouette shows.
-    $bs = [int]([math]::Round($sz * 0.40))
-    $ox = 0.0
-    if ($bs -ge 5) {
-        $u = $bs / 24.0
-        $g.FillRectangle((New-Object Drawing.SolidBrush($C.MarkLight)), [single]0, [single]0, [single]$bs, [single]($bs * 30 / 24))
-        $g.FillRectangle((New-Object Drawing.SolidBrush($C.Bg)), [single](6 * $u), [single](6 * $u * 1.25), [single](12 * $u), [single](18 * $u * 1.25))
-        $g.FillRectangle((New-Object Drawing.SolidBrush($C.MarkDark)), [single](6 * $u), [single](12 * $u * 1.25), [single](12 * $u), [single](12 * $u * 1.25))
-        $ox = $bs * 0.22   # shift the number away from the badge
+    # Droid Bar's tray pattern (rounded square, semantic fill color) with the
+    # OpenCode logo mark as the glyph instead of the usage number: the fill
+    # still carries the usage state (dark/orange/red), the mark says which app
+    # it is. The no-data ('…') and error ('!') states keep drawing as text.
+    $g.FillPath((New-Object Drawing.SolidBrush($bg)), (New-RoundPath (New-Object Drawing.RectangleF(0, 0, ($sz - 1), ($sz - 1))) ($sz / 5)))
+    if ($text -eq '…' -or $text -eq '!') {
+        $px = $sz * 0.72
+        do {
+            $font = New-Object Drawing.Font('Segoe UI', [single]$px, [Drawing.FontStyle]::Bold, [Drawing.GraphicsUnit]::Pixel)
+            $m = $g.MeasureString($text, $font, 1000, [Drawing.StringFormat]::GenericTypographic)
+            if ($m.Width -le $sz - 1) { break }
+            $font.Dispose(); $px -= 0.5
+        } while ($px -gt 5)
+        $sf = New-Object Drawing.StringFormat([Drawing.StringFormat]::GenericTypographic)
+        $sf.Alignment = 'Center'; $sf.LineAlignment = 'Center'
+        $g.DrawString($text, $font, (New-Object Drawing.SolidBrush($fg)), (New-Object Drawing.RectangleF(0, ($sz * 0.04), $sz, $sz)), $sf)
+        $g.Dispose(); $font.Dispose()
+        return $bmp
     }
-    $px = $sz * 0.72
-    do {
-        $font = New-Object Drawing.Font('Segoe UI', [single]$px, [Drawing.FontStyle]::Bold, [Drawing.GraphicsUnit]::Pixel)
-        $m = $g.MeasureString($text, $font, 1000, [Drawing.StringFormat]::GenericTypographic)
-        if ($m.Width -le $sz - 1 - 2 * $ox) { break }
-        $font.Dispose(); $px -= 0.5
-    } while ($px -gt 5)
-    $sf = New-Object Drawing.StringFormat([Drawing.StringFormat]::GenericTypographic)
-    $sf.Alignment = 'Center'; $sf.LineAlignment = 'Center'
-    $g.DrawString($text, $font, (New-Object Drawing.SolidBrush($fg)), (New-Object Drawing.RectangleF($ox, ($sz * 0.04 + $ox * 0.4), ($sz - $ox), ($sz - $ox))), $sf)
-    $g.Dispose(); $font.Dispose()
+    # Logo mark from the official brand SVG's square variant (viewBox 24x30),
+    # drawn as a white silhouette with the hole filled by the background color
+    # so the usage state shows through it.
+    $h = $sz * 0.62
+    $w = $h * 24 / 30
+    $x = ($sz - $w) / 2
+    $y = ($sz - $h) / 2
+    $ux = $w / 24.0; $uy = $h / 30.0
+    $white = New-Object Drawing.SolidBrush($C.MarkLight)
+    $bgBrush = New-Object Drawing.SolidBrush($bg)
+    $g.FillRectangle($white, [single]$x, [single]$y, [single]$w, [single]$h)
+    $g.FillRectangle($bgBrush, [single]($x + 6 * $ux), [single]($y + 6 * $uy), [single](12 * $ux), [single](18 * $uy))
+    $g.FillRectangle($white, [single]($x + 6 * $ux), [single]($y + 12 * $uy), [single](12 * $ux), [single](12 * $uy))
+    $g.Dispose()
     return $bmp
 }
 
