@@ -4,24 +4,25 @@ Add-Type -AssemblyName System.Drawing
 $root = $PSScriptRoot
 $src  = Join-Path $root 'src'
 
-# --- icon: dark rounded square with three orange usage bars (PNGs inside an .ico)
+# --- icon: dark circle with a cyan ring and three cyan usage bars (PNGs inside an .ico).
+# The circle + cyan is the app's identity, distinct from Droid Bar's orange rounded square.
 function New-IconPng([int]$sz) {
     $bmp = New-Object Drawing.Bitmap($sz, $sz)
     $g = [Drawing.Graphics]::FromImage($bmp)
     $g.SmoothingMode = 'AntiAlias'
-    $r = $sz * 0.2; $d = $r * 2; $e = $sz - 1
-    $p = New-Object Drawing.Drawing2D.GraphicsPath
-    $p.AddArc(0, 0, $d, $d, 180, 90); $p.AddArc($e - $d, 0, $d, $d, 270, 90)
-    $p.AddArc($e - $d, $e - $d, $d, $d, 0, 90); $p.AddArc(0, $e - $d, $d, $d, 90, 90); $p.CloseFigure()
-    $g.FillPath((New-Object Drawing.SolidBrush([Drawing.Color]::FromArgb(18, 18, 18))), $p)
+    $ringW = [math]::Max(1.0, $sz / 12.0)
+    $body = New-Object Drawing.RectangleF([single]$ringW, [single]$ringW, [single]($sz - 2 * $ringW - 1), [single]($sz - 2 * $ringW - 1))
+    $g.FillEllipse((New-Object Drawing.SolidBrush([Drawing.Color]::FromArgb(18, 18, 18))), $body)
+    $cyan = [Drawing.Color]::FromArgb(34, 211, 238)
+    $g.DrawEllipse((New-Object Drawing.Pen($cyan, $ringW)), $body)
     $track = New-Object Drawing.SolidBrush([Drawing.Color]::FromArgb(60, 60, 60))
-    $orange = New-Object Drawing.SolidBrush([Drawing.Color]::FromArgb(255, 92, 0))
-    $m = $sz * 0.18; $w = $sz - 2 * $m; $h = [math]::Max(2, $sz * 0.13)
+    $accent = New-Object Drawing.SolidBrush($cyan)
+    $m = $sz * 0.24; $w = $sz - 2 * $m; $h = [math]::Max(2, $sz * 0.11)
     $i = 0
     foreach ($f in 0.58, 0.40, 0.20) {
-        $y = $sz * 0.24 + $i * $sz * 0.2
+        $y = $sz * 0.30 + $i * $sz * 0.16
         $g.FillRectangle($track, [single]$m, [single]$y, [single]$w, [single]$h)
-        $g.FillRectangle($orange, [single]$m, [single]$y, [single]($w * [math]::Max($f, 0.25)), [single]$h)
+        $g.FillRectangle($accent, [single]$m, [single]$y, [single]($w * [math]::Max($f, 0.25)), [single]$h)
         $i++
     }
     $g.Dispose()

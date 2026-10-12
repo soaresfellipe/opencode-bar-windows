@@ -172,6 +172,7 @@ $C = @{
     Track   = [Drawing.Color]::FromArgb(38, 38, 38)
     Orange  = [Drawing.Color]::FromArgb(255, 92, 0)
     Red     = [Drawing.Color]::FromArgb(239, 68, 68)
+    Cyan    = [Drawing.Color]::FromArgb(34, 211, 238)
     Link    = [Drawing.Color]::FromArgb(200, 200, 200)
 }
 $F = @{
@@ -228,7 +229,8 @@ function Draw-Popup($g, [int]$W, [int]$H) {
     $pen = New-Object Drawing.Pen($C.Border)
     $g.DrawRectangle($pen, 0, 0, $W - 1, $H - 1)
 
-    Draw-Text $g 'Usage Limits' $F.Title $pad ([int]($pad + 3 * $s)) $C.Text
+    # Cyan title: the popup's identity accent (Droid Bar's titles are white).
+    Draw-Text $g 'Usage Limits' $F.Title $pad ([int]($pad + 3 * $s)) $C.Cyan
 
     # bars: the three Go windows (rolling 5-hour, weekly, monthly)
     $y = $pad + [int](50 * $s)
@@ -299,7 +301,14 @@ function New-TrayBitmap([string]$text, $bg, $fg, [int]$sz) {
     $g = [Drawing.Graphics]::FromImage($bmp)
     $g.SmoothingMode = 'AntiAlias'
     $g.TextRenderingHint = 'AntiAliasGridFit'
-    $g.FillPath((New-Object Drawing.SolidBrush($bg)), (New-RoundPath (New-Object Drawing.RectangleF(0, 0, ($sz - 1), ($sz - 1))) ($sz / 5)))
+    # Circle body + cyan ring: the ring is the app's visual identity, so the icon
+    # is distinguishable from Droid Bar's orange rounded square at a glance. The
+    # fill keeps the usage semantics (dark/orange/red); the ring never changes.
+    $rect = New-Object Drawing.RectangleF(1, 1, ($sz - 3), ($sz - 3))
+    $g.FillEllipse((New-Object Drawing.SolidBrush($bg)), $rect)
+    $ring = New-Object Drawing.Pen($C.Cyan, [math]::Max(1.0, $sz / 12.0))
+    $g.DrawEllipse($ring, $rect)
+    $ring.Dispose()
     $px = $sz * 0.72
     do {
         $font = New-Object Drawing.Font('Segoe UI', [single]$px, [Drawing.FontStyle]::Bold, [Drawing.GraphicsUnit]::Pixel)
